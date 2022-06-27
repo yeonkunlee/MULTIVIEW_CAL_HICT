@@ -94,6 +94,8 @@ if __name__ == '__main__':
 
     detector_rescale = 0.5
 
+    detector = apriltag.Detector()
+
     while True:
 
         # empty image buffer
@@ -105,9 +107,6 @@ if __name__ == '__main__':
                                  prefix)
 
         for i, cam in enumerate(cam_list):
-
-            detector = apriltag.Detector()
-
             # GET SERIAL NO.
             device_serial_number = ''
             nodemap_tldevice = cam.GetTLDeviceNodeMap()
@@ -115,6 +114,9 @@ if __name__ == '__main__':
                 nodemap_tldevice.GetNode('DeviceSerialNumber'))
             if PySpin.IsAvailable(node_device_serial_number) and PySpin.IsReadable(node_device_serial_number):
                 device_serial_number = node_device_serial_number.GetValue()
+
+            if device_serial_number != args.left_serial and device_serial_number != args.right_serial:
+                continue
 
             image_result = cam.GetNextImage(1000)
 
@@ -151,27 +153,27 @@ if __name__ == '__main__':
 
                 # number of detected tag
                 num_detected_tag_right = len(detector_result)
-
+            
             image_result.Release()
 
-            # concate left and right image
-            im_data_show = np.concatenate(
-                [im_data_left_show, im_data_right_show], axis=1)
-            cv2.imshow('image', im_data_show)
+        # concate left and right image
+        im_data_show = np.concatenate(
+            [im_data_left_show, im_data_right_show], axis=1)
+        cv2.imshow('image', im_data_show)
 
-            if num_detected_tag_left == 12 and num_detected_tag_right == 12:
-                print('both camera detected full tag. save image')
-                debug_filename = os.path.join(
-                    image_dir, 'debug', '%04d.jpg' % (img_counter % max_image_num))
-                # if not os.path.isdir(image_dir):
-                #     os.makedirs(os.path.dirname(image_dir)) # not working because of the permission issue
-                right_filename = os.path.join(
-                    image_dir, 'right_'+args.right_serial, '%04d.jpg' % (img_counter % max_image_num))
-                left_filename = os.path.join(
-                    image_dir, 'left_'+args.left_serial, '%04d.jpg' % (img_counter % max_image_num))
-                cv2.imwrite(right_filename, im_data_right)
-                cv2.imwrite(left_filename, im_data_left)
-                cv2.imwrite(debug_filename, im_data_show)
+        if num_detected_tag_left == 12 and num_detected_tag_right == 12:
+            print('both camera detected full tag. save image')
+            debug_filename = os.path.join(
+                image_dir, 'debug', '%04d.jpg' % (img_counter % max_image_num))
+            # if not os.path.isdir(image_dir):
+            #     os.makedirs(os.path.dirname(image_dir)) # not working because of the permission issue
+            right_filename = os.path.join(
+                image_dir, 'right_'+args.right_serial, '%04d.jpg' % (img_counter % max_image_num))
+            left_filename = os.path.join(
+                image_dir, 'left_'+args.left_serial, '%04d.jpg' % (img_counter % max_image_num))
+            cv2.imwrite(right_filename, im_data_right)
+            cv2.imwrite(left_filename, im_data_left)
+            cv2.imwrite(debug_filename, im_data_show)
 
         img_counter += 1
         counter += 1

@@ -71,10 +71,10 @@ if __name__ == '__main__':
 
     detector_rescale = 0.5
 
+    detector = apriltag.Detector()
+
     while True:
         for i, cam in enumerate(cam_list):
-
-            detector = apriltag.Detector()
 
             # GET SERIAL NO.
             device_serial_number = ''
