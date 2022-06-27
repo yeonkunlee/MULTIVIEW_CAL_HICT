@@ -92,9 +92,13 @@ if __name__ == '__main__':
     counter = 0
     img_counter = 0
 
+    detector = apriltag.Detector()
     detector_rescale = 0.5
 
-    detector = apriltag.Detector()
+    # image writing speed is too fast. disable imwrite in some time
+    imwrite_enable = False
+    imwrite_time = time.time()
+    imwrite_interval = 1.0
 
     while True:
 
@@ -103,8 +107,22 @@ if __name__ == '__main__':
         im_data_right_show = np.zeros((768, 1024, 3), dtype=np.uint8)
 
         prefix = 'left_' + args.left_serial + '_right_' + args.right_serial
-        image_dir = os.path.join('/home/yeonkunlee/docker_workspace/multiview_calibration/MULTIVIEW/cal_image/extrinsic_images',
+        image_dir = os.path.join('/home/hict/yeonkunlee/MULTIVIEW_CAL_HICT/cal_image/extrinsic_images',
                                  prefix)
+
+        debug_dir = debug_filename = os.path.join(
+                image_dir, 'debug')
+        if not os.path.isdir(debug_dir):
+            os.makedirs(debug_dir)
+        
+        right_image_dir = os.path.join(
+                image_dir, 'right_'+args.right_serial)
+        if not os.path.isdir(right_image_dir):
+            os.makedirs(right_image_dir)
+        left_image_dir = os.path.join(
+                image_dir, 'left_'+args.left_serial)
+        if not os.path.isdir(left_image_dir):
+            os.makedirs(left_image_dir)
 
         for i, cam in enumerate(cam_list):
             # GET SERIAL NO.
@@ -164,16 +182,18 @@ if __name__ == '__main__':
         if num_detected_tag_left == 12 and num_detected_tag_right == 12:
             print('both camera detected full tag. save image')
             debug_filename = os.path.join(
-                image_dir, 'debug', '%04d.jpg' % (img_counter % max_image_num))
-            # if not os.path.isdir(image_dir):
-            #     os.makedirs(os.path.dirname(image_dir)) # not working because of the permission issue
+                debug_dir, '%04d.jpg' % (img_counter % max_image_num))
+            if not os.path.isdir(image_dir):
+                os.makedirs(os.path.dirname(image_dir)) # not working because of the permission issue
             right_filename = os.path.join(
-                image_dir, 'right_'+args.right_serial, '%04d.jpg' % (img_counter % max_image_num))
+                right_image_dir, '%04d.jpg' % (img_counter % max_image_num))
             left_filename = os.path.join(
-                image_dir, 'left_'+args.left_serial, '%04d.jpg' % (img_counter % max_image_num))
-            cv2.imwrite(right_filename, im_data_right)
-            cv2.imwrite(left_filename, im_data_left)
-            cv2.imwrite(debug_filename, im_data_show)
+                left_image_dir, '%04d.jpg' % (img_counter % max_image_num))
+            if imwrite_enable:
+                cv2.imwrite(debug_filename, im_data_show)
+                cv2.imwrite(right_filename, im_data_right)
+                cv2.imwrite(left_filename, im_data_left)
+                imwrite_enable = False
 
         img_counter += 1
         counter += 1
@@ -182,6 +202,11 @@ if __name__ == '__main__':
                 display_time, counter/(time.time() - start_time)))
             counter = 0
             start_time = time.time()
+
+        # imwrite_enable
+        if time.time() - imwrite_time > imwrite_interval:
+            imwrite_enable = True
+            imwrite_time = time.time()
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

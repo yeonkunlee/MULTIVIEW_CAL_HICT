@@ -60,18 +60,17 @@ if __name__ == '__main__':
 
     camera_initialization(cam_list)
 
-    for i, cam in enumerate(cam_list):
-        cam.BeginAcquisition()
+    detector = apriltag.Detector()
 
     max_image_num = 4000
     start_time = time.time()
     display_time = 1.0
     counter = 0
     img_counter = 0
-
     detector_rescale = 0.5
 
-    detector = apriltag.Detector()
+    for i, cam in enumerate(cam_list):
+        cam.BeginAcquisition()
 
     while True:
         for i, cam in enumerate(cam_list):
