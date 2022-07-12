@@ -36,9 +36,12 @@ def camera_initialization(_cam_list):
         print(cam.PixelFormat.GetValue())
 
 
-def draw_corners(_img, _tag):
+def draw_corners(_img, _tag, _rescale_factor):
     # draw the four lines with corners. corners are in (x, y). float type
     corners = _tag.corners
+    corners = corners * _rescale_factor
+    centers = _tag.center
+    centers = centers * _rescale_factor
     cv2.line(_img, (int(corners[0, 0]), int(corners[0, 1])),
              (int(corners[1, 0]), int(corners[1, 1])), (0, 255, 0), 2)
     cv2.line(_img, (int(corners[1, 0]), int(corners[1, 1])),
@@ -48,10 +51,10 @@ def draw_corners(_img, _tag):
     cv2.line(_img, (int(corners[3, 0]), int(corners[3, 1])),
              (int(corners[0, 0]), int(corners[0, 1])), (0, 255, 0), 2)
 
-    cv2.circle(_img, (int(_tag.center[0]), int(_tag.center[1])),
+    cv2.circle(_img, (int(centers[0]), int(centers[1])),
                2, (0, 255, 0), 2)
     # draw the tag id. int type
-    cv2.putText(_img, str(_tag.tag_id), (int(_tag.center[0]), int(_tag.center[1])),
+    cv2.putText(_img, str(_tag.tag_id), (int(centers[0]), int(centers[1])),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     return _img
@@ -92,13 +95,16 @@ if __name__ == '__main__':
     counter = 0
     img_counter = 0
 
-    detector = apriltag.Detector()
+    options = apriltag.DetectorOptions(families="tag36h11")
+    detector = apriltag.Detector(options)
     detector_rescale = 0.5
 
     # image writing speed is too fast. disable imwrite in some time
     imwrite_enable = False
     imwrite_time = time.time()
-    imwrite_interval = 1.0
+    imwrite_interval = 0.5
+
+    number_of_images_confirmed = 0
 
     while True:
 
@@ -124,6 +130,8 @@ if __name__ == '__main__':
         if not os.path.isdir(left_image_dir):
             os.makedirs(left_image_dir)
 
+        left_tagname_list = []
+        right_tagname_list = []
         for i, cam in enumerate(cam_list):
             # GET SERIAL NO.
             device_serial_number = ''
@@ -138,6 +146,8 @@ if __name__ == '__main__':
 
             image_result = cam.GetNextImage(1000)
 
+            
+
             if device_serial_number == args.left_serial:
                 im_data_left = image_result.GetNDArray()
                 im_data_left = cv2.cvtColor(
@@ -146,14 +156,17 @@ if __name__ == '__main__':
                 im_data_show = copy.deepcopy(im_data_left)
                 im_data_show = cv2.resize(
                     im_data_show, (0, 0), fx=detector_rescale, fy=detector_rescale)
-                detector_result = detector.detect(
-                    cv2.cvtColor(im_data_show, cv2.COLOR_BGR2GRAY))
-                for tag in detector_result:
-                    im_data_show = draw_corners(im_data_show, tag)
+                left_detector_result = detector.detect(
+                    cv2.cvtColor(im_data_left, cv2.COLOR_BGR2GRAY))
+                for tag in left_detector_result:
+                    im_data_show = draw_corners(im_data_show, tag, detector_rescale)
+                    left_tagname = tag.tag_id
+                    left_tagname_list.append(left_tagname)
                 im_data_left_show = im_data_show
 
                 # number of detected tag
-                num_detected_tag_left = len(detector_result)
+                num_detected_tag_left = len(left_detector_result)
+
 
             if device_serial_number == args.right_serial:
                 im_data_right = image_result.GetNDArray()
@@ -163,14 +176,16 @@ if __name__ == '__main__':
                 im_data_show = copy.deepcopy(im_data_right)
                 im_data_show = cv2.resize(
                     im_data_show, (0, 0), fx=detector_rescale, fy=detector_rescale)
-                detector_result = detector.detect(
-                    cv2.cvtColor(im_data_show, cv2.COLOR_BGR2GRAY))
-                for tag in detector_result:
-                    im_data_show = draw_corners(im_data_show, tag)
+                right_detector_result = detector.detect(
+                    cv2.cvtColor(im_data_right, cv2.COLOR_BGR2GRAY))
+                for tag in right_detector_result:
+                    im_data_show = draw_corners(im_data_show, tag, detector_rescale)
+                    right_tagname = tag.tag_id
+                    right_tagname_list.append(right_tagname)
                 im_data_right_show = im_data_show
 
                 # number of detected tag
-                num_detected_tag_right = len(detector_result)
+                num_detected_tag_right = len(right_detector_result)
             
             image_result.Release()
 
@@ -179,21 +194,30 @@ if __name__ == '__main__':
             [im_data_left_show, im_data_right_show], axis=1)
         cv2.imshow('image', im_data_show)
 
-        if num_detected_tag_left == 12 and num_detected_tag_right == 12:
+        # duplicated tag name
+        duplicated_tag_name_list = list(set(left_tagname_list) & set(right_tagname_list))
+        # print(duplicated_tag_name_list)
+
+        # if num_detected_tag_left == 12 and num_detected_tag_right == 12:
+        if len(duplicated_tag_name_list) >= 6:
             print('both camera detected full tag. save image')
             debug_filename = os.path.join(
-                debug_dir, '%04d.jpg' % (img_counter % max_image_num))
+                debug_dir, '%04d.png' % (img_counter % max_image_num))
             if not os.path.isdir(image_dir):
                 os.makedirs(os.path.dirname(image_dir)) # not working because of the permission issue
             right_filename = os.path.join(
-                right_image_dir, '%04d.jpg' % (img_counter % max_image_num))
+                right_image_dir, '%04d.png' % (img_counter % max_image_num))
             left_filename = os.path.join(
-                left_image_dir, '%04d.jpg' % (img_counter % max_image_num))
+                left_image_dir, '%04d.png' % (img_counter % max_image_num))
             if imwrite_enable:
+                # puttext debug_filename number_of_images_confirmed
+                cv2.putText(im_data_show, str(number_of_images_confirmed), (60, 80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 3.0, (0, 255, 0), 2)
                 cv2.imwrite(debug_filename, im_data_show)
                 cv2.imwrite(right_filename, im_data_right)
                 cv2.imwrite(left_filename, im_data_left)
                 imwrite_enable = False
+                number_of_images_confirmed += 1
 
         img_counter += 1
         counter += 1

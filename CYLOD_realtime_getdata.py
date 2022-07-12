@@ -60,14 +60,22 @@ if __name__ == '__main__':
 
     camera_initialization(cam_list)
 
-    detector = apriltag.Detector()
+    options = apriltag.DetectorOptions(families="tag36h11")
+    detector = apriltag.Detector(options)
 
-    max_image_num = 4000
+    max_image_num = 2000
     start_time = time.time()
     display_time = 1.0
     counter = 0
     img_counter = 0
-    detector_rescale = 0.5
+    detector_rescale_vis = 0.5
+
+    # image writing speed is too fast. disable imwrite in some time
+    imwrite_enable = False
+    imwrite_time = time.time()
+    imwrite_interval = 0.5
+
+    number_of_images_confirmed = 0
 
     for i, cam in enumerate(cam_list):
         cam.BeginAcquisition()
@@ -83,22 +91,35 @@ if __name__ == '__main__':
             if PySpin.IsAvailable(node_device_serial_number) and PySpin.IsReadable(node_device_serial_number):
                 device_serial_number = node_device_serial_number.GetValue()
 
-            filename = os.path.join('/workspace/multiview_calibration/MULTIVIEW/cal_image/extrinsic_images',
-                                    device_serial_number, '%04d.jpg' % (img_counter % max_image_num))
+            image_dir = os.path.join('/home/hict/yeonkunlee/MULTIVIEW_CAL_HICT/cal_image/intrinsic_images',
+                                    device_serial_number)
+            if not os.path.exists(image_dir):
+                os.makedirs(image_dir)
+            filename = os.path.join(image_dir, '%04d.png' % (img_counter % max_image_num))
 
             image_result = cam.GetNextImage(1000)
             if device_serial_number == args.serial_number:
                 im_data = image_result.GetNDArray()
                 im_data = cv2.cvtColor(im_data, cv2.COLOR_BayerBG2BGR)
-                cv2.imwrite(filename, im_data)
-
+                # cv2.imwrite(filename, im_data)
                 im_data_show = copy.deepcopy(im_data)
                 im_data_show = cv2.resize(
-                    im_data_show, (0, 0), fx=detector_rescale, fy=detector_rescale)
-                detector_result = detector.detect(
-                    cv2.cvtColor(im_data_show, cv2.COLOR_BGR2GRAY))
+                    im_data_show, (0, 0), fx=detector_rescale_vis, fy=detector_rescale_vis)
+
+                # apriltag detector appears to show error. check it
+                try:
+                    detector_result = detector.detect(
+                        cv2.cvtColor(im_data, cv2.COLOR_BGR2GRAY))
+                except:
+                    print('Apriltag detector error. This appearence usually means that dark view image aquired.')
+                    continue
+
+                # detector_result = detector.detect(
+                #     cv2.cvtColor(im_data, cv2.COLOR_BGR2GRAY))
+
                 for tag in detector_result:
-                    corners = tag.corners  # shape is (4, 2)
+                    corners = tag.corners * detector_rescale_vis # shape is (4, 2)
+                    centers = tag.center * detector_rescale_vis # shape is (2,)
                     # draw the four lines with corners. corners are in (x, y). float type
                     cv2.line(im_data_show, (int(corners[0, 0]), int(corners[0, 1])),
                              (int(corners[1, 0]), int(corners[1, 1])), (0, 255, 0), 2)
@@ -112,14 +133,32 @@ if __name__ == '__main__':
                     # cv2.rectangle(im_data_show, (int(corners[0, 0]), int(corners[0, 1])),
                     #               (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
                     # draw the tag center point. float type
-                    cv2.circle(im_data_show, (int(tag.center[0]), int(tag.center[1])),
+                    cv2.circle(im_data_show, (int(centers[0]), int(centers[1])),
                                2, (0, 255, 0), 2)
                     # draw the tag id. int type
-                    cv2.putText(im_data_show, str(tag.tag_id), (int(tag.center[0]), int(tag.center[1])),
+                    cv2.putText(im_data_show, str(tag.tag_id), (int(centers[0]), int(centers[1])),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                # imsave if detector result length == 12
+                
+                if len(detector_result) == 12 and imwrite_enable:
+                    cv2.imwrite(filename, im_data)
+                    number_of_images_confirmed += 1
+                    imwrite_enable = False
 
+                # mirror image after all processing. for convenience
+                # im_data_show = cv2.flip(im_data_show, 1)
+                #plot number_of_images_confirmed to image corner
+                # cv2.putText arguments are : (image, text, (x, y), font, fontScale, (B, G, R), thickness, lineType)
+                cv2.putText(im_data_show, str(number_of_images_confirmed), (60, 80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 3.0, (0, 255, 0), 2)
                 cv2.imshow('frame', im_data_show)
+                
             image_result.Release()
+
+        # imwrite_enable = True
+        if time.time() - imwrite_time > imwrite_interval:
+            imwrite_enable = True
+            imwrite_time = time.time()
 
         img_counter += 1
         counter += 1

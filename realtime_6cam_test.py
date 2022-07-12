@@ -10,6 +10,13 @@ import copy
 import argparse
 import apriltag
 
+def mp_imwrite_raw(im_path, im_data):
+    # im_data = im_data.GetNDArray()
+    # im_data = cv2.cvtColor(im_data, cv2.COLOR_BayerBG2BGR)
+    fid=open(im_path, "bw")
+    im_data.tofile(fid)
+    fid.close()
+    return im_data
 
 def camera_initialization(_cam_list):
     for _i, cam in enumerate(_cam_list):
@@ -48,7 +55,7 @@ if __name__ == '__main__':
     for i, cam in enumerate(cam_list):
         cam.BeginAcquisition()
 
-    max_image_num = 4000
+    max_image_num = 8000
     start_time = time.time()
     display_time = 1.0
     counter = 0
@@ -56,8 +63,15 @@ if __name__ == '__main__':
 
     detector_rescale = 0.5
 
+    options = apriltag.DetectorOptions(families="tag36h11")
+    detector = apriltag.Detector(options)
+
+    cwd = os.getcwd()
+    root_dir = os.path.join(cwd, 'acquired_image')
+    print(root_dir)
+
     while True:
-        detector = apriltag.Detector()
+        
         for i, cam in enumerate(cam_list):
             # GET SERIAL NO.
             device_serial_number = ''
@@ -69,7 +83,15 @@ if __name__ == '__main__':
 
             image_result = cam.GetNextImage(1000)
             im_data = image_result.GetNDArray()
-            # im_data = cv2.cvtColor(im_data, cv2.COLOR_BayerBG2BGR)
+            im_data = cv2.cvtColor(im_data, cv2.COLOR_BayerBG2BGR)
+
+            # save images to serial number directory
+            if not os.path.isdir(os.path.join(root_dir, device_serial_number)):
+                os.makedirs(os.path.join(root_dir, device_serial_number))
+            image_filename = os.path.join(root_dir, device_serial_number, '%04d.raw'%img_counter)
+
+            mp_imwrite_raw(image_filename, im_data)
+            # cv2.imwrite(os.path.join(root_dir, device_serial_number, '%04d.png'%img_counter), im_data)
 
             image_result.Release()
 
