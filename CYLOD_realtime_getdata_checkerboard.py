@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import copy
 import argparse
-import apriltag
+# import apriltag
 
 
 def mp_imwrite_raw(im_path, im_data):
@@ -60,8 +60,10 @@ if __name__ == '__main__':
 
     camera_initialization(cam_list)
 
-    options = apriltag.DetectorOptions(families="tag36h11")
-    detector = apriltag.Detector(options)
+    # options = apriltag.DetectorOptions(families="tag36h11")
+    # detector = apriltag.Detector(options)
+
+    checker_board_size = (9, 10) # (rows, cols)
 
     max_image_num = 2000
     start_time = time.time()
@@ -91,7 +93,7 @@ if __name__ == '__main__':
             if PySpin.IsAvailable(node_device_serial_number) and PySpin.IsReadable(node_device_serial_number):
                 device_serial_number = node_device_serial_number.GetValue()
 
-            image_dir = os.path.join('/home/hict/yeonkunlee/MULTIVIEW_CAL_HICT/cal_image/intrinsic_images',
+            image_dir = os.path.join('/home/hict/yeonkunlee/MULTIVIEW_CAL_HICT/cal_image/intrinsic_images_checker',
                                     device_serial_number)
             if not os.path.exists(image_dir):
                 os.makedirs(image_dir)
@@ -101,7 +103,7 @@ if __name__ == '__main__':
             if device_serial_number == args.serial_number:
                 im_data = image_result.GetNDArray()
                 im_data = cv2.cvtColor(im_data, cv2.COLOR_BayerBG2BGR)
-
+                
                 im_data = im_data[228:228+1080, 64:64+1920, :]
 
                 # cv2.imwrite(filename, im_data)
@@ -109,41 +111,52 @@ if __name__ == '__main__':
                 im_data_show = cv2.resize(
                     im_data_show, (0, 0), fx=detector_rescale_vis, fy=detector_rescale_vis)
 
-                # apriltag detector appears to show error. check it
-                try:
-                    detector_result = detector.detect(
-                        cv2.cvtColor(im_data, cv2.COLOR_BGR2GRAY))
-                except:
-                    print('Apriltag detector error. This appearence usually means that dark view image aquired.')
-                    continue
+                # find checkerboard
+                success, corners = cv2.findChessboardCorners(cv2.cvtColor(im_data, cv2.COLOR_BGR2GRAY), checker_board_size, flags=cv2.CALIB_CB_FAST_CHECK)
+
+                # # apriltag detector appears to show error. check it
+                # try:
+                #     detector_result = detector.detect(
+                #         cv2.cvtColor(im_data, cv2.COLOR_BGR2GRAY))
+                # except:
+                #     print('Apriltag detector error. This appearence usually means that dark view image aquired.')
+                #     continue
 
                 # detector_result = detector.detect(
                 #     cv2.cvtColor(im_data, cv2.COLOR_BGR2GRAY))
 
-                for tag in detector_result:
-                    corners = tag.corners * detector_rescale_vis # shape is (4, 2)
-                    centers = tag.center * detector_rescale_vis # shape is (2,)
-                    # draw the four lines with corners. corners are in (x, y). float type
-                    cv2.line(im_data_show, (int(corners[0, 0]), int(corners[0, 1])),
-                             (int(corners[1, 0]), int(corners[1, 1])), (0, 255, 0), 2)
-                    cv2.line(im_data_show, (int(corners[1, 0]), int(corners[1, 1])),
-                             (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
-                    cv2.line(im_data_show, (int(corners[2, 0]), int(corners[2, 1])),
-                             (int(corners[3, 0]), int(corners[3, 1])), (0, 255, 0), 2)
-                    cv2.line(im_data_show, (int(corners[3, 0]), int(corners[3, 1])),
-                             (int(corners[0, 0]), int(corners[0, 1])), (0, 255, 0), 2)
+                if success:
+                    cv2.drawChessboardCorners(im_data_show, checker_board_size, corners, success)
 
-                    # cv2.rectangle(im_data_show, (int(corners[0, 0]), int(corners[0, 1])),
-                    #               (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
-                    # draw the tag center point. float type
-                    cv2.circle(im_data_show, (int(centers[0]), int(centers[1])),
-                               2, (0, 255, 0), 2)
-                    # draw the tag id. int type
-                    cv2.putText(im_data_show, str(tag.tag_id), (int(centers[0]), int(centers[1])),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                # for tag in detector_result:
+                #     corners = tag.corners * detector_rescale_vis # shape is (4, 2)
+                #     centers = tag.center * detector_rescale_vis # shape is (2,)
+                #     # draw the four lines with corners. corners are in (x, y). float type
+                #     cv2.line(im_data_show, (int(corners[0, 0]), int(corners[0, 1])),
+                #              (int(corners[1, 0]), int(corners[1, 1])), (0, 255, 0), 2)
+                #     cv2.line(im_data_show, (int(corners[1, 0]), int(corners[1, 1])),
+                #              (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
+                #     cv2.line(im_data_show, (int(corners[2, 0]), int(corners[2, 1])),
+                #              (int(corners[3, 0]), int(corners[3, 1])), (0, 255, 0), 2)
+                #     cv2.line(im_data_show, (int(corners[3, 0]), int(corners[3, 1])),
+                #              (int(corners[0, 0]), int(corners[0, 1])), (0, 255, 0), 2)
+
+                #     # cv2.rectangle(im_data_show, (int(corners[0, 0]), int(corners[0, 1])),
+                #     #               (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
+                #     # draw the tag center point. float type
+                #     cv2.circle(im_data_show, (int(centers[0]), int(centers[1])),
+                #                2, (0, 255, 0), 2)
+                #     # draw the tag id. int type
+                #     cv2.putText(im_data_show, str(tag.tag_id), (int(centers[0]), int(centers[1])),
+                #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 # imsave if detector result length == 12
                 
-                if len(detector_result) == 12 and imwrite_enable:
+                # if len(detector_result) == 12 and imwrite_enable:
+                #     cv2.imwrite(filename, im_data)
+                #     number_of_images_confirmed += 1
+                #     imwrite_enable = False
+
+                if success and imwrite_enable:
                     cv2.imwrite(filename, im_data)
                     number_of_images_confirmed += 1
                     imwrite_enable = False

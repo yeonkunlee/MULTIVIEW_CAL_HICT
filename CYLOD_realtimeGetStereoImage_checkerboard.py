@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import copy
 import argparse
-import apriltag
+# import apriltag
 
 
 def mp_imwrite_raw(im_path, im_data):
@@ -36,28 +36,28 @@ def camera_initialization(_cam_list):
         print(cam.PixelFormat.GetValue())
 
 
-def draw_corners(_img, _tag, _rescale_factor):
-    # draw the four lines with corners. corners are in (x, y). float type
-    corners = _tag.corners
-    corners = corners * _rescale_factor
-    centers = _tag.center
-    centers = centers * _rescale_factor
-    cv2.line(_img, (int(corners[0, 0]), int(corners[0, 1])),
-             (int(corners[1, 0]), int(corners[1, 1])), (0, 255, 0), 2)
-    cv2.line(_img, (int(corners[1, 0]), int(corners[1, 1])),
-             (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
-    cv2.line(_img, (int(corners[2, 0]), int(corners[2, 1])),
-             (int(corners[3, 0]), int(corners[3, 1])), (0, 255, 0), 2)
-    cv2.line(_img, (int(corners[3, 0]), int(corners[3, 1])),
-             (int(corners[0, 0]), int(corners[0, 1])), (0, 255, 0), 2)
+# def draw_corners(_img, _tag, _rescale_factor):
+#     # draw the four lines with corners. corners are in (x, y). float type
+#     corners = _tag.corners
+#     corners = corners * _rescale_factor
+#     centers = _tag.center
+#     centers = centers * _rescale_factor
+#     cv2.line(_img, (int(corners[0, 0]), int(corners[0, 1])),
+#              (int(corners[1, 0]), int(corners[1, 1])), (0, 255, 0), 2)
+#     cv2.line(_img, (int(corners[1, 0]), int(corners[1, 1])),
+#              (int(corners[2, 0]), int(corners[2, 1])), (0, 255, 0), 2)
+#     cv2.line(_img, (int(corners[2, 0]), int(corners[2, 1])),
+#              (int(corners[3, 0]), int(corners[3, 1])), (0, 255, 0), 2)
+#     cv2.line(_img, (int(corners[3, 0]), int(corners[3, 1])),
+#              (int(corners[0, 0]), int(corners[0, 1])), (0, 255, 0), 2)
 
-    cv2.circle(_img, (int(centers[0]), int(centers[1])),
-               2, (0, 255, 0), 2)
-    # draw the tag id. int type
-    cv2.putText(_img, str(_tag.tag_id), (int(centers[0]), int(centers[1])),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+#     cv2.circle(_img, (int(centers[0]), int(centers[1])),
+#                2, (0, 255, 0), 2)
+#     # draw the tag id. int type
+#     cv2.putText(_img, str(_tag.tag_id), (int(centers[0]), int(centers[1])),
+#                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-    return _img
+#     return _img
 
 
 if __name__ == '__main__':
@@ -95,9 +95,11 @@ if __name__ == '__main__':
     counter = 0
     img_counter = 0
 
-    options = apriltag.DetectorOptions(families="tag36h11")
-    detector = apriltag.Detector(options)
-    detector_rescale = 0.5
+    # options = apriltag.DetectorOptions(families="tag36h11")
+    # detector = apriltag.Detector(options)
+    checker_board_size = (9, 10) # (rows, cols)
+
+    vis_scale = 0.4
 
     # image writing speed is too fast. disable imwrite in some time
     imwrite_enable = False
@@ -113,7 +115,7 @@ if __name__ == '__main__':
         im_data_right_show = np.zeros((768, 1024, 3), dtype=np.uint8)
 
         prefix = 'left_' + args.left_serial + '_right_' + args.right_serial
-        image_dir = os.path.join('/home/hict/yeonkunlee/MULTIVIEW_CAL_HICT/cal_image/extrinsic_images',
+        image_dir = os.path.join('/home/hict/yeonkunlee/MULTIVIEW_CAL_HICT/cal_image/extrinsic_images_checker',
                                  prefix)
 
         debug_dir = debug_filename = os.path.join(
@@ -130,8 +132,8 @@ if __name__ == '__main__':
         if not os.path.isdir(left_image_dir):
             os.makedirs(left_image_dir)
 
-        left_tagname_list = []
-        right_tagname_list = []
+        # left_tagname_list = []
+        # right_tagname_list = []
         for i, cam in enumerate(cam_list):
             # GET SERIAL NO.
             device_serial_number = ''
@@ -156,19 +158,14 @@ if __name__ == '__main__':
                 im_data_left = im_data_left[228:228+1080, 64:64+1920, :]
 
                 im_data_show = copy.deepcopy(im_data_left)
-                im_data_show = cv2.resize(
-                    im_data_show, (0, 0), fx=detector_rescale, fy=detector_rescale)
-                left_detector_result = detector.detect(
-                    cv2.cvtColor(im_data_left, cv2.COLOR_BGR2GRAY))
-                for tag in left_detector_result:
-                    im_data_show = draw_corners(im_data_show, tag, detector_rescale)
-                    left_tagname = tag.tag_id
-                    left_tagname_list.append(left_tagname)
-                im_data_left_show = im_data_show
-
-                # number of detected tag
-                num_detected_tag_left = len(left_detector_result)
-
+                
+                # find checkerboard
+                left_success, left_corners = cv2.findChessboardCorners(cv2.cvtColor(im_data_left, cv2.COLOR_BGR2GRAY), checker_board_size, flags=cv2.CALIB_CB_FAST_CHECK)
+                # draw checkerboard
+                if left_success:
+                    cv2.drawChessboardCorners(im_data_show, checker_board_size, left_corners, left_success)
+                im_data_left_show = cv2.resize(
+                    im_data_show, (0, 0), fx=vis_scale, fy=vis_scale)
 
             if device_serial_number == args.right_serial:
                 im_data_right = image_result.GetNDArray()
@@ -176,35 +173,30 @@ if __name__ == '__main__':
                     im_data_right, cv2.COLOR_BayerBG2BGR)
 
                 im_data_right = im_data_right[228:228+1080, 64:64+1920, :]
-
                 im_data_show = copy.deepcopy(im_data_right)
-                im_data_show = cv2.resize(
-                    im_data_show, (0, 0), fx=detector_rescale, fy=detector_rescale)
-                right_detector_result = detector.detect(
-                    cv2.cvtColor(im_data_right, cv2.COLOR_BGR2GRAY))
-                for tag in right_detector_result:
-                    im_data_show = draw_corners(im_data_show, tag, detector_rescale)
-                    right_tagname = tag.tag_id
-                    right_tagname_list.append(right_tagname)
-                im_data_right_show = im_data_show
+                right_success, right_corners = cv2.findChessboardCorners(cv2.cvtColor(im_data_right, cv2.COLOR_BGR2GRAY), checker_board_size, flags=cv2.CALIB_CB_FAST_CHECK)
 
-                # number of detected tag
-                num_detected_tag_right = len(right_detector_result)
-            
+                # draw checkerboard
+                if right_success:
+                    cv2.drawChessboardCorners(im_data_show, checker_board_size, right_corners, right_success)
+                im_data_right_show = cv2.resize(
+                    im_data_show, (0, 0), fx=vis_scale, fy=vis_scale)
+                # find checkerboard
+
             image_result.Release()
 
         # concate left and right image
         im_data_show = np.concatenate(
             [im_data_left_show, im_data_right_show], axis=1)
+        cv2.putText(im_data_show, str(number_of_images_confirmed), (60, 80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 3.0, (0, 255, 0), 2)
+
         cv2.imshow('image', im_data_show)
 
-        # duplicated tag name
-        duplicated_tag_name_list = list(set(left_tagname_list) & set(right_tagname_list))
-        # print(duplicated_tag_name_list)
 
         # if num_detected_tag_left == 12 and num_detected_tag_right == 12:
-        if len(duplicated_tag_name_list) >= 6:
-            print('both camera detected full tag. save image')
+        if left_success and right_success:
+            print('both camera detected checkerboard. save image')
             debug_filename = os.path.join(
                 debug_dir, '%04d.png' % (img_counter % max_image_num))
             if not os.path.isdir(image_dir):
@@ -215,8 +207,6 @@ if __name__ == '__main__':
                 left_image_dir, '%04d.png' % (img_counter % max_image_num))
             if imwrite_enable:
                 # puttext debug_filename number_of_images_confirmed
-                cv2.putText(im_data_show, str(number_of_images_confirmed), (60, 80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 3.0, (0, 255, 0), 2)
                 cv2.imwrite(debug_filename, im_data_show)
                 cv2.imwrite(right_filename, im_data_right)
                 cv2.imwrite(left_filename, im_data_left)
